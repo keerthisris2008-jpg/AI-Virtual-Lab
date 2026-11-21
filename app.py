@@ -1,65 +1,138 @@
- 
+
 import streamlit as st
+import chess
+import chess.svg
+import random
+import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="AI Virtual Lab",
-    page_icon="🤖",
+    page_title="AI Virtual Chess",
+    page_icon="♟️",
     layout="wide"
 )
 
-st.title("🤖 AI VIRTUAL LAB")
-st.subheader("Artificial Intelligence – Problem Solving Laboratory")
+st.title("♟️ AI Virtual Chess")
+st.caption("Play chess against an AI opponent!")
 
-st.write(
-    "Welcome to the AI Virtual Lab! "
-    "Explore classical Artificial Intelligence problems "
-    "through interactive experiments."
-)
+# Initialize game
+if "board" not in st.session_state:
+    st.session_state.board = chess.Board()
 
-experiments = {
-    "Tic-Tac-Toe": "Game playing and Minimax algorithm",
-    "8-Queen Problem": "Constraint satisfaction and backtracking",
-    "Chess Problem": "Game trees and search algorithms",
-    "Tower of Hanoi": "Recursion and state-space representation",
-    "Travelling Salesperson": "Combinatorial optimisation",
-    "Monkey and Banana": "State-space search and planning",
-    "Cryptarithmetic": "Constraint satisfaction",
-    "Block World": "AI planning and goal-based problem solving"
-}
+if "game_over" not in st.session_state:
+    st.session_state.game_over = False
 
-choice = st.sidebar.selectbox(
-    "Select an AI Experiment",
-    list(experiments.keys())
-)
+board = st.session_state.board
 
-st.header(choice)
-st.info(experiments[choice])
+# AI move
+def ai_move(board):
+    legal_moves = list(board.legal_moves)
 
-st.markdown("---")
-st.subheader("Experiment Instructions")
+    if not legal_moves:
+        return
 
-st.write("1. Understand the problem.")
-st.write("2. Identify the initial state and goal state.")
-st.write("3. Study the algorithm.")
-st.write("4. Run the experiment.")
-st.write("5. Observe and record the result.")
+    # Simple AI: prioritize captures
+    captures = [
+        move for move in legal_moves
+        if board.is_capture(move)
+    ]
 
-if choice == "Tic-Tac-Toe":
-    st.write("Tic-Tac-Toe experiment will be developed here.")
-elif choice == "8-Queen Problem":
-    st.write("8-Queen visualisation will be developed here.")
-elif choice == "Chess Problem":
-    st.write("Chess experiment will be developed here.")
-elif choice == "Tower of Hanoi":
-    st.write("Tower of Hanoi simulation will be developed here.")
-elif choice == "Travelling Salesperson":
-    st.write("Travelling Salesperson simulation will be developed here.")
-elif choice == "Monkey and Banana":
-    st.write("Monkey and Banana problem will be developed here.")
-elif choice == "Cryptarithmetic":
-    st.write("Cryptarithmetic solver will be developed here.")
-elif choice == "Block World":
-    st.write("Block World simulation will be developed here.")
+    if captures:
+        move = random.choice(captures)
+    else:
+        move = random.choice(legal_moves)
 
-st.markdown("---")
-st.caption("EEE Department | AI Virtual Laboratory")
+    board.push(move)
+
+# Display chessboard
+def show_board():
+    svg = chess.svg.board(
+        board=board,
+        size=500,
+        coordinates=True
+    )
+
+    components.html(svg, height=530)
+
+# Game controls
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("🔄 New Game"):
+        st.session_state.board = chess.Board()
+        st.rerun()
+
+with col2:
+    if st.button("↩️ Undo Move"):
+        if len(board.move_stack) > 0:
+            board.pop()
+
+        if len(board.move_stack) > 0 and not board.turn:
+            board.pop()
+
+        st.rerun()
+
+# Display board
+show_board()
+
+# Move input
+st.subheader("Make Your Move")
+
+if not board.is_game_over():
+
+    if board.turn == chess.WHITE:
+
+        move_text = st.text_input(
+            "Enter your move (example: e2e4)",
+            placeholder="e2e4"
+        )
+
+        if st.button("Make Move"):
+            try:
+                move = chess.Move.from_uci(move_text.strip())
+
+                if move in board.legal_moves:
+                    board.push(move)
+
+                    if not board.is_game_over():
+                        ai_move(board)
+
+                    st.rerun()
+
+                else:
+                    st.error("Illegal move! Try another move.")
+
+            except ValueError:
+                st.error("Invalid format! Use notation like e2e4.")
+
+    else:
+        st.info("AI is thinking...")
+
+# Game status
+if board.is_checkmate():
+    st.success(
+        "Checkmate! " +
+        ("Black wins!" if board.turn == chess.WHITE else "White wins!")
+    )
+
+elif board.is_stalemate():
+    st.warning("Draw by stalemate!")
+
+elif board.is_game_over():
+    st.info(f"Game Over: {board.result()}")
+
+elif board.is_check():
+    st.warning("Check!")
+
+st.subheader("Game Information")
+
+st.write("**Current turn:**",
+         "White" if board.turn == chess.WHITE else "Black")
+
+st.write("**Moves played:**", len(board.move_stack))
+
+with st.expander("Move History"):
+    st.write(" ".join(
+        f"{i // 2 + 1}. {move.uci()}"
+        for i, move in enumerate(board.move_stack)
+    ))
+
